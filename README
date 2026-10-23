@@ -1,0 +1,21 @@
+# Showcase Scanner
+
+Unofficial tool that reads screenshots of your Pokémon GO detail/appraisal screen and estimates its Pokémon Showcase score. Runs entirely in your browser: no account, no server, and your screenshots are never uploaded.
+
+**Use it:** open the site, then in Chrome on Android choose Install app. Take a screenshot of a Pokémon with the appraisal open, tap Share, and pick Showcase Scanner. You can also pick screenshots from inside the page, or add one by hand.
+
+## How it works
+- Text recognition ([Tesseract.js](https://github.com/naptha/tesseract.js)) reads the species line, weight and height. The IV bars are measured from the picture's pixels.
+- Score = 800 × height/max + 150 × weight/max + 50 × IVs/45, plus 178 for XXL. This is the community-researched formula, not an official one, so results can differ from the game by a few points because the game rounds height and weight.
+- Species sizes and XXL limits come from a snapshot of the game data (October 2026). Newer species won't be listed until the data is refreshed.
+
+## Known limits
+- Tested only on English screenshots from one Android phone. Other languages, screen sizes and appraisal layouts may not read correctly; unreadable ones are listed so you can add them by hand.
+- Regional forms with identical sizes can be picked wrong. Check those rows.
+- The share-menu feature needs Chrome on Android. Other browsers can still use the file picker.
+- If IVs can't be read, the row assumes 15/15/15 and is marked with an asterisk.
+
+## Credits
+Height/weight/IV formula research from the community (see the [PokémonDB showcase calculator](https://pokemondb.net/go/showcases)). Species data from the [PokeMiners game master](https://github.com/PokeMiners/game_masters).
+
+Not affiliated with or endorsed by Niantic, Nintendo, or The Pokémon Company. It only reads screenshots you take yourself.
