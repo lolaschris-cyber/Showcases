@@ -2,6 +2,7 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Showcase Scanner</title>
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#2f6fed"><link rel="icon" href="icon-192.png">
 <style>
 :root{--bg:#f7f7f5;--card:#fff;--tx:#1d1d1b;--mu:#6b6b66;--bd:#dcdcd6;--ac:#2f6fed;--ok:#1a7f4b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161615;--card:#212120;--tx:#ecece8;--mu:#9a9a93;--bd:#383835;--ac:#6c9bff;--ok:#4cc38a;color-scheme:dark}}
@@ -74,14 +75,17 @@ function species(D,text){
 function bars(img,words){
  const W=img.width,H=img.height,k=W/1080,px=(x,y)=>{const i=(y*W+x)*4;return[img.data[i],img.data[i+1],img.data[i+2]]};
  const cls=([r,g,b])=>{const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=.299*r+.587*g+.114*b;return mx-mn>70&&r>170?'F':(mx-mn<25&&l>190&&l<246?'T':'W')};
- const f=re=>words.filter(w=>re.test(w.text)&&w.bbox.y0>H*.5&&w.bbox.x0<W*.4);
- const a=f(/^Attack/i)[0],d=f(/^Defen/i)[0],h=f(/^HP$/)[0];
- if(!a||!d||!h)return null;
- const one=l=>{let best=null;for(let y=l.bbox.y1+Math.round(8*k);y<l.bbox.y1+Math.round(80*k)&&y<H;y++){let F=0,T=0,xs=-1,xe=-1,g=0;
-   for(let x=Math.max(0,l.bbox.x0-8);x<W;x++){const c=cls(px(x,y));if(c!=='W'){if(xs<0)xs=x;xe=x;g=0;c==='F'?F++:T++}else if(xs>=0&&++g>16*k)break}
-   if(xe-xs>200*k&&(!best||F+T>best.n))best={F,T,n:F+T}}
-  return best?Math.round(15*best.F/(best.F+best.T)):null};
- const v=[one(a),one(d),one(h)];return v.every(x=>x!==null)?v:null}
+ const row=y=>{let F=0,T=0,xs=-1,g=0,hit=null;
+  for(let x=Math.round(60*k);x<W*.7;x++){const c=cls(px(x,y));
+   if(c!=='W'){if(xs<0){xs=x;F=0;T=0}g=0;c==='F'?F++:T++}
+   else if(xs>=0&&++g>16*k){const L=x-g-xs;if(L>340*k&&L<410*k&&xs>100*k&&xs<160*k&&F+T>L*.85&&F+T>0)hit={F,T,n:F+T};xs=-1;g=0}}
+  if(xs>=0){const L=W*.7-xs;if(L>340*k&&L<410*k&&xs>100*k&&xs<160*k&&F+T>L*.85)hit={F,T,n:F+T}}
+  return hit};
+ const out=[];let cur=[];
+ for(let y=Math.round(H*.55);y<H-2;y++){const r=row(y);if(r)cur.push(r);else if(cur.length){if(cur.length>=12&&cur.length<=40)out.push(cur[cur.length>>1]);cur=[]}}
+ if(cur.length>=12&&cur.length<=40)out.push(cur[cur.length>>1]);
+ if(out.length<3)return null;
+ const v=out.slice(0,3).map(b=>Math.round(15*b.F/b.n));return v}
 async function scan(img,D,recog){
  const full=await recog(img,{psm:3,wl:''});
  const anchor=full.words.find(w=>/^HP$/.test(w.text)&&w.bbox.y0<img.height*.6);
@@ -111,14 +115,19 @@ async function recog(img,o){await worker.setParameters({tessedit_pageseg_mode:St
  const c=document.createElement('canvas');c.width=img.width;c.height=img.height;c.getContext('2d').putImageData(new ImageData(img.data,img.width,img.height),0,0);
  return (await worker.recognize(c)).data}
 async function load(f){const b=await createImageBitmap(f),c=document.createElement('canvas');c.width=b.width;c.height=b.height;const x=c.getContext('2d');x.drawImage(b,0,0);return x.getImageData(0,0,c.width,c.height)}
-(async()=>{try{worker=await Tesseract.createWorker('eng');$('st').textContent='Ready. Choose screenshots above.'}catch(e){$('st').textContent='Couldn’t load the text reader. Check your connection.'}})();
-$('fi').onchange=async()=>{const fs=[...$('fi').files];if(!fs.length)return;if(!worker){$('er').textContent='Text reader isn’t ready yet.';return}
+const ready=(async()=>{try{worker=await Tesseract.createWorker('eng');$('st').textContent='Ready. Choose screenshots above, or share them to this app.'}catch(e){$('st').textContent='Couldn’t load the text reader. Check your connection.'}})();
+async function runScan(fs){if(!fs.length)return;$('st').textContent='Loading text reader…';await ready;if(!worker){$('er').textContent='Text reader isn’t available.';return}
  let ok=0;const bad=[];$('er').textContent='';
  for(let i=0;i<fs.length;i++){$('st').textContent='Reading '+(i+1)+' of '+fs.length+'…';
   try{const r=await Core.scan(await load(fs[i]),D,recog);
    if(r.r&&r.size){addEntry(r.r,r.size.h,r.size.w,r.iv||[15,15,15],!!r.iv,r.xxl);ok++}
    else{bad.push(fs[i].name+' ('+(r.r?'size':'species')+' not found)');if(r.name)$('sp').value=r.name;if(r.size){$('h').value=r.size.h;$('w').value=r.size.w}}
   }catch(e){bad.push(fs[i].name+' (error)')}}
- $('st').textContent='Added '+ok+' of '+fs.length+'.';if(bad.length)$('er').textContent='Couldn’t read: '+bad.join(', ')+'. Use Add manually for these.';$('fi').value=''};
+ $('st').textContent='Added '+ok+' of '+fs.length+'.';if(bad.length)$('er').textContent='Couldn’t read: '+bad.join(', ')+'. Use Add manually for these.'}
+$('fi').onchange=async()=>{await runScan([...$('fi').files]);$('fi').value=''};
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+(async()=>{if(!/[?&]shared=1/.test(location.search))return;history.replaceState(null,'',location.pathname);
+ try{const c=await caches.open('shared-shots'),fs=[];for(const k of await c.keys()){const b=await (await c.match(k)).blob();fs.push(new File([b],decodeURIComponent(k.url.split('/').pop()),{type:b.type}));await c.delete(k)}runScan(fs)}
+ catch(e){$('er').textContent='Couldn’t open the shared screenshots.'}})();
 render();
 </script></body></html>
